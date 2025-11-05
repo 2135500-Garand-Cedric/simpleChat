@@ -28,6 +28,8 @@ public class ChatClient extends AbstractClient
    */
   ChatIF clientUI; 
 
+  int loginId;
+
   
   //Constructors ****************************************************
   
@@ -39,10 +41,11 @@ public class ChatClient extends AbstractClient
    * @param clientUI The interface type variable.
    */
   
-  public ChatClient(String host, int port, ChatIF clientUI) 
+  public ChatClient(String host, int port, ChatIF clientUI, int loginId) 
     throws IOException 
   {
     super(host, port); //Call the superclass constructor
+    this.loginId = loginId;
     this.clientUI = clientUI;
     this.openConnection();
   }
@@ -57,7 +60,12 @@ public class ChatClient extends AbstractClient
    */
   public void handleMessageFromServer(Object msg) 
   {
-    clientUI.display(msg.toString());
+    String message = msg.toString();
+    if (message.startsWith("SERVER MESSAGE>")) {
+      System.out.println(message);
+    } else {
+      clientUI.display(msg.toString());
+    }
   }
 
   /**
@@ -183,12 +191,26 @@ public class ChatClient extends AbstractClient
 
   protected void connectionClosed() {
     clientUI.display
-      ("The server has shut down (1).  Terminating client.");
+      ("Connection closed.");
   }
 
   protected void connectionException(Exception exception) {
     clientUI.display
-      ("The server has shut down (2).  Terminating client.");
+      ("The server has shut down.  Terminating client.");
+    System.exit(0);
+  }
+
+  protected void connectionEstablished() {
+    try {
+      sendToServer("#login " + this.loginId);
+      System.out.println(this.loginId + " has logged on.");
+    }
+    catch(IOException e)
+    {
+      clientUI.display
+        ("Could not send message to server.  Terminating client.");
+      quit();
+    }
   }
 }
 //End of ChatClient class

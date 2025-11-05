@@ -59,8 +59,39 @@ public class EchoServer extends AbstractServer
   public void handleMessageFromClient
     (Object msg, ConnectionToClient client)
   {
-    System.out.println("Message received: " + msg + " from " + client);
-    this.sendToAllClients(msg);
+    System.out.println("Message received: " + msg + " from " + client.getInfo("loginId"));
+    String message = msg.toString();
+    if (message.startsWith("#login")) {
+      try {
+        int loginId = Integer.parseInt(message.split(" ")[1]);
+        if (client.getInfo("loginId") == null) {
+          client.setInfo("loginId", loginId);
+          System.out.println(loginId + " has logged on.");
+        } else {
+          client.sendToClient("Error: Already logged in.  Terminating Client.");
+          try {
+            client.close();
+          } catch(IOException e) {
+            serverUI.display
+              ("Could not close the client successfully.  Terminating server.");
+            System.exit(0);
+          }
+        }
+      } catch (Exception e) {
+        System.out.println
+          ("Error with the loginId.  Terminating Client.");
+        try {
+          client.close();
+        } catch(IOException ex) {
+          serverUI.display
+            ("Could not close the client successfully.  Terminating server.");
+          System.exit(0);
+        }
+      }
+    } else {
+      this.sendToAllClients(client.getInfo("loginId") + " - " + msg);
+    }
+    
   }
 
   public void handleMessageFromServerUI(String message) {
@@ -82,7 +113,7 @@ public class EchoServer extends AbstractServer
       }
     } else {
       serverUI.display(message);
-      this.sendToAllClients(message);
+      this.sendToAllClients("SERVER MESSAGE> " + message);
     }
   }
 
@@ -90,6 +121,7 @@ public class EchoServer extends AbstractServer
     try {
       this.close();
     } catch(IOException e) {}
+    System.out.println("Server is quitting.");
     System.exit(0);
   }
 
@@ -175,12 +207,12 @@ public class EchoServer extends AbstractServer
   synchronized protected void clientDisconnected(ConnectionToClient client) {
     // super.clientDisconnected(client);
     System.out.println
-      ("Client " + client + " has disconnected from server.");
+      (client.getInfo("loginId") + " has disconnected from server.");
   }
 
   synchronized protected void clientException(ConnectionToClient client, Throwable exception) {
     System.out.println
-      ("Client " + client + " has disconnected from server.");
+      (client.getInfo("loginId") + " has disconnected from server.");
   }
   
   //Class methods ***************************************************
