@@ -5,6 +5,9 @@ package edu.seg2105.edu.server.backend;
 
 
 import ocsf.server.*;
+import edu.seg2105.edu.server.ui.ServerConsole;
+import edu.seg2105.client.common.*;
+import java.io.*;
 
 /**
  * This class overrides some of the methods in the abstract 
@@ -23,6 +26,14 @@ public class EchoServer extends AbstractServer
    * The default port to listen on.
    */
   final public static int DEFAULT_PORT = 5555;
+
+  //Instance variables **********************************************
+
+  /**
+   * The interface type variable.  It allows the implementation of 
+   * the display method in the client.
+   */
+  ChatIF serverUI; 
   
   //Constructors ****************************************************
   
@@ -51,6 +62,90 @@ public class EchoServer extends AbstractServer
     System.out.println("Message received: " + msg + " from " + client);
     this.sendToAllClients(msg);
   }
+
+  public void handleMessageFromServerUI(String message) {
+    if (message.startsWith("#")) {
+      if (message.equals("#quit")) {
+        this.serverQuit();
+      } else if (message.equals("#stop")) {
+        this.serverStop();
+      } else if (message.equals("#close")) {
+        this.serverClose();
+      } else if (message.startsWith("#setport") && message.split(" ").length == 2) {
+        this.serverSetport(message);
+      } else if (message.equals("#start")) {
+        this.serverStart();
+      } else if (message.equals("#getport")) {
+        this.serverGetport();
+      } else {
+        this.serverNoCommand();
+      }
+    } else {
+      serverUI.display(message);
+      this.sendToAllClients(message);
+    }
+  }
+
+  private void serverQuit() {
+    try {
+      this.close();
+    } catch(IOException e) {}
+    System.exit(0);
+  }
+
+  private void serverStop() {
+    this.stopListening();
+  }
+
+  private void serverClose() {
+    try {
+      this.close();
+    } catch(IOException e) {
+      serverUI.display
+        ("Could not close the connections successfully.  Terminating server.");
+      System.exit(0);
+    }
+  }
+
+  private void serverSetport(String message) {
+    if (this.isListening()) {
+      serverUI.display
+        ("The #setport command cannot be run when the server is listening to connections.");
+    } else {
+      try {
+        int newPort = Integer.parseInt(message.split(" ")[1]);
+        this.setPort(newPort);
+      } catch (NumberFormatException e) {
+        serverUI.display
+          ("Error: <host> is not a valid number");
+      }
+    }
+  }
+
+  private void serverStart() {
+    if (this.isListening()) {
+      serverUI.display
+        ("The #start command cannot be run when the server is already listening to connections.");
+    } else {
+      try {
+        this.listen();
+      } catch(IOException e) {
+        serverUI.display
+          ("Could not start to listen to connections successfully.  Terminating server.");
+        System.exit(0);
+      }
+    }
+  }
+
+  private void serverGetport() {
+    serverUI.display
+      ("Current port number: " + this.getPort());
+  }
+
+  private void serverNoCommand() {
+    serverUI.display
+      ("This command does not exist.");
+  }
     
   /**
    * This method overrides the one in the superclass.  Called
@@ -78,11 +173,15 @@ public class EchoServer extends AbstractServer
   }
 
   synchronized protected void clientDisconnected(ConnectionToClient client) {
-    super.clientDisconnected(client);
+    // super.clientDisconnected(client);
     System.out.println
       ("Client " + client + " has disconnected from server.");
   }
-  
+
+  synchronized protected void clientException(ConnectionToClient client, Throwable exception) {
+    System.out.println
+      ("Client " + client + " has disconnected from server.");
+  }
   
   //Class methods ***************************************************
   
@@ -107,6 +206,15 @@ public class EchoServer extends AbstractServer
     }
 	
     EchoServer sv = new EchoServer(port);
+
+    ServerConsole console = new ServerConsole(sv);
+
+    // Run the accept() loop in a separate thread:
+    Thread consoleThread = new Thread(() -> console.accept());
+    consoleThread.start();
+
+    // Now we store it in the server instance so handleMessageFromServerUI can use it
+    sv.serverUI = console;
     
     try 
     {
