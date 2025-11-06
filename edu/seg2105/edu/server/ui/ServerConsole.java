@@ -7,24 +7,19 @@ import edu.seg2105.edu.server.backend.EchoServer;
 import edu.seg2105.client.common.*;
 
 /**
- * This class constructs the UI for a chat client.  It implements the
- * chat interface in order to activate the display() method.
- * Warning: Some of the code here is cloned in ServerConsole 
+ * Makes it possible to have a console on the server
+ * Similar principle and code than the ClientConsole class
  *
- * @author Fran&ccedil;ois B&eacute;langer
- * @author Dr Timothy C. Lethbridge  
- * @author Dr Robert Lagani&egrave;re
+ * @author Cedric Garand
  */
 public class ServerConsole implements ChatIF 
 {
   //Instance variables **********************************************
   
   /**
-   * The instance of the client that created this ConsoleChat.
+   * The instance of the server that created this ConsoleChat.
    */
   EchoServer server;
-  
-  
   
   /**
    * Scanner to read from the console
@@ -35,16 +30,15 @@ public class ServerConsole implements ChatIF
   //Constructors ****************************************************
 
   /**
-   * Constructs an instance of the ClientConsole UI.
+   * Constructs an instance of the ServerConsole UI.
    *
-   * @param host The host to connect to.
-   * @param port The port to connect on.
+   * @param server The server that created the console
    */
   public ServerConsole(EchoServer server) 
   {
     this.server = server;
     // Create scanner object to read from console
-    fromConsole = new Scanner(System.in); 
+    this.fromConsole = new Scanner(System.in); 
   }
 
   
@@ -54,22 +48,16 @@ public class ServerConsole implements ChatIF
    * This method waits for input from the console.  Once it is 
    * received, it sends it to the client's message handler.
    */
-  public void accept() 
-  {
-    try
-    {
-
+  public void accept() {
+    try {
       String message;
 
       while (true) 
       {
-        message = fromConsole.nextLine();
-        server.handleMessageFromServerUI(message);
+        message = this.fromConsole.nextLine();
+        this.server.handleMessageFromServerUI(message);
       }
-    } 
-    catch (Exception ex) 
-    {
-      ex.printStackTrace();
+    } catch (Exception ex) {
       System.out.println
         ("Unexpected error while reading from console!");
     }

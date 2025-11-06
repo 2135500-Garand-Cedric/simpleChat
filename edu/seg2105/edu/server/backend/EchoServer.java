@@ -59,41 +59,57 @@ public class EchoServer extends AbstractServer
   public void handleMessageFromClient
     (Object msg, ConnectionToClient client)
   {
-    System.out.println("Message received: " + msg + " from " + client.getInfo("loginId"));
     String message = msg.toString();
+    System.out.println("Message received: " + message + " from " + client.getInfo("loginId"));
+    
     if (message.startsWith("#login")) {
-      try {
-        int loginId = Integer.parseInt(message.split(" ")[1]);
-        if (client.getInfo("loginId") == null) {
-          client.setInfo("loginId", loginId);
-          System.out.println(loginId + " has logged on.");
-        } else {
-          client.sendToClient("Error: Already logged in.  Terminating Client.");
-          try {
-            client.close();
-          } catch(IOException e) {
-            serverUI.display
-              ("Could not close the client successfully.  Terminating server.");
-            System.exit(0);
-          }
-        }
-      } catch (Exception e) {
-        System.out.println
-          ("Error with the loginId.  Terminating Client.");
-        try {
-          client.close();
-        } catch(IOException ex) {
-          serverUI.display
-            ("Could not close the client successfully.  Terminating server.");
-          System.exit(0);
-        }
-      }
+      this.handleFirstLoginFromClient(message, client);
     } else {
       this.sendToAllClients(client.getInfo("loginId") + " - " + msg);
     }
     
   }
 
+  /**
+   * Helper function to handle the first message sent from a client and set its loginId
+   * 
+   * @param message The message received from the client (starting with #login)
+   * @param client The connection from which the message originated.
+   */
+  private void handleFirstLoginFromClient(String message, ConnectionToClient client) {
+    try {
+      String loginId = message.split(" ")[1];
+      if (client.getInfo("loginId") == null) {
+        client.setInfo("loginId", loginId);
+        System.out.println(loginId + " has logged on.");
+      } else {
+        client.sendToClient("Error: Already logged in.  Terminating Client.");
+        try {
+          client.close();
+        } catch(IOException e) {
+          this.serverUI.display
+            ("Could not close the client successfully.  Terminating server.");
+          System.exit(0);
+        }
+      }
+    } catch (Exception e) {
+      System.out.println
+        ("Error with the loginId.  Terminating Client.");
+      try {
+        client.close();
+      } catch(IOException ex) {
+        this.serverUI.display
+          ("Could not close the client successfully.  Terminating server.");
+        System.exit(0);
+      }
+    }
+  }
+
+  /**
+   * This method handles all data coming from the UI            
+   *
+   * @param message The message from the UI.    
+   */
   public void handleMessageFromServerUI(String message) {
     if (message.startsWith("#")) {
       if (message.equals("#quit")) {
@@ -112,11 +128,14 @@ public class EchoServer extends AbstractServer
         this.serverNoCommand();
       }
     } else {
-      serverUI.display(message);
+      this.serverUI.display(message);
       this.sendToAllClients("SERVER MESSAGE> " + message);
     }
   }
 
+  /**
+   * Helper functions for all the different commands for the server
+   */
   private void serverQuit() {
     try {
       this.close();
@@ -133,7 +152,7 @@ public class EchoServer extends AbstractServer
     try {
       this.close();
     } catch(IOException e) {
-      serverUI.display
+      this.serverUI.display
         ("Could not close the connections successfully.  Terminating server.");
       System.exit(0);
     }
@@ -141,7 +160,7 @@ public class EchoServer extends AbstractServer
 
   private void serverSetport(String message) {
     if (this.isListening()) {
-      serverUI.display
+      this.serverUI.display
         ("The #setport command cannot be run when the server is listening to connections.");
     } else {
       try {
@@ -156,13 +175,13 @@ public class EchoServer extends AbstractServer
 
   private void serverStart() {
     if (this.isListening()) {
-      serverUI.display
+      this.serverUI.display
         ("The #start command cannot be run when the server is already listening to connections.");
     } else {
       try {
         this.listen();
       } catch(IOException e) {
-        serverUI.display
+        this.serverUI.display
           ("Could not start to listen to connections successfully.  Terminating server.");
         System.exit(0);
       }
@@ -170,12 +189,12 @@ public class EchoServer extends AbstractServer
   }
 
   private void serverGetport() {
-    serverUI.display
+    this.serverUI.display
       ("Current port number: " + this.getPort());
   }
 
   private void serverNoCommand() {
-    serverUI.display
+    this.serverUI.display
       ("This command does not exist.");
   }
     
@@ -183,33 +202,37 @@ public class EchoServer extends AbstractServer
    * This method overrides the one in the superclass.  Called
    * when the server starts listening for connections.
    */
+  @Override
   protected void serverStarted()
   {
     System.out.println
-      ("Server listening for connections on port " + getPort());
+      ("Server listening for connections on port " + this.getPort());
   }
   
   /**
    * This method overrides the one in the superclass.  Called
    * when the server stops listening for connections.
    */
+  @Override
   protected void serverStopped()
   {
     System.out.println
       ("Server has stopped listening for connections.");
   }
 
+  @Override
   protected void clientConnected(ConnectionToClient client) {
     System.out.println
-      ("Client " + client + " has connected to server.");
+      ("A new client has connected to the server.");
   }
 
+  @Override
   synchronized protected void clientDisconnected(ConnectionToClient client) {
-    // super.clientDisconnected(client);
     System.out.println
       (client.getInfo("loginId") + " has disconnected from server.");
   }
 
+  @Override
   synchronized protected void clientException(ConnectionToClient client, Throwable exception) {
     System.out.println
       (client.getInfo("loginId") + " has disconnected from server.");
@@ -241,11 +264,18 @@ public class EchoServer extends AbstractServer
 
     ServerConsole console = new ServerConsole(sv);
 
-    // Run the accept() loop in a separate thread:
-    Thread consoleThread = new Thread(() -> console.accept());
+    // Creating a new thread for the console so that 
+    // I can have 1 thread that waits for the console inputs
+    // And 1 thread that waits for the connections
+    Thread consoleThread = new Thread(
+      new Runnable() {
+      @Override
+      public void run() {
+        console.accept();
+      }  
+    });
     consoleThread.start();
 
-    // Now we store it in the server instance so handleMessageFromServerUI can use it
     sv.serverUI = console;
     
     try 

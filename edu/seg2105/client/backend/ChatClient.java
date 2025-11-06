@@ -28,7 +28,11 @@ public class ChatClient extends AbstractClient
    */
   ChatIF clientUI; 
 
-  int loginId;
+  /**
+   * Login Id of the client trying to connect to the server.
+   * To give a way for the server to identify connections and messages sent.
+   */
+  String loginId;
 
   
   //Constructors ****************************************************
@@ -39,15 +43,22 @@ public class ChatClient extends AbstractClient
    * @param host The server to connect to.
    * @param port The port number to connect on.
    * @param clientUI The interface type variable.
+   * @param loginId The loginId of the client.
    */
   
-  public ChatClient(String host, int port, ChatIF clientUI, int loginId) 
+  public ChatClient(String host, int port, ChatIF clientUI, String loginId) 
     throws IOException 
   {
     super(host, port); //Call the superclass constructor
     this.loginId = loginId;
     this.clientUI = clientUI;
-    this.openConnection();
+    try {
+      this.openConnection();
+    } catch(IOException e) {
+      System.out.println
+        ("ERROR - Can't setup connection! Terminating client.");
+      System.exit(0);
+    }
   }
 
   
@@ -63,9 +74,9 @@ public class ChatClient extends AbstractClient
     String message = msg.toString();
     if (message.startsWith("SERVER MESSAGE>")) {
       System.out.println(message);
-    } else {
-      clientUI.display(msg.toString());
+      return;
     }
+    this.clientUI.display(message);
   }
 
   /**
@@ -94,28 +105,28 @@ public class ChatClient extends AbstractClient
         this.clientNoCommand();
       }
     } else {
-      try
-      {
-        sendToServer(message);
-      }
-      catch(IOException e)
-      {
-        clientUI.display
+      try {
+        this.sendToServer(message);
+      } catch(IOException e) {
+        this.clientUI.display
           ("Could not send message to server.  Terminating client.");
-        quit();
+        this.quit();
       }
     }
   }
 
+  /**
+   * Helper functions for all the different commands for the client
+   */
   private void clientQuit() {
-    quit();
+    this.quit();
   }
 
   private void clientLogoff() {
     try {
       this.closeConnection();
     } catch(IOException e) {
-      clientUI.display
+      this.clientUI.display
         ("Error disconnecting from server.  Terminating client.");
       System.exit(0);
     }
@@ -123,7 +134,7 @@ public class ChatClient extends AbstractClient
 
   private void clientSethost(String message) {
     if (this.isConnected()) {
-      clientUI.display
+      this.clientUI.display
         ("The #sethost command cannot be run when the client is connected to the server.");
     } else {
       String newHost = message.split(" ")[1];
@@ -133,14 +144,14 @@ public class ChatClient extends AbstractClient
 
   private void clientSetport(String message) {
     if (this.isConnected()) {
-      clientUI.display
+      this.clientUI.display
         ("The #setport command cannot be run when the client is connected to the server.");
     } else {
       try {
         int newPort = Integer.parseInt(message.split(" ")[1]);
         this.setPort(newPort);
       } catch (NumberFormatException e) {
-        clientUI.display
+        this.clientUI.display
           ("Error: <host> is not a valid number");
       }
     }
@@ -148,13 +159,13 @@ public class ChatClient extends AbstractClient
 
   private void clientLogin() {
     if (this.isConnected()) {
-      clientUI.display
+      this.clientUI.display
         ("The #login command cannot be run when the client is connected to the server.");
     } else {
       try {
         this.openConnection();
       } catch(IOException e) {
-        clientUI.display
+        this.clientUI.display
           ("Could not connect to the server.  Terminating client.");
         System.exit(0);
       }
@@ -162,17 +173,17 @@ public class ChatClient extends AbstractClient
   }
 
   private void clientGethost() {
-    clientUI.display
+    this.clientUI.display
       ("Current host name: " + this.getHost());
   }
 
   private void clientGetport() {
-    clientUI.display
+    this.clientUI.display
       ("Current port number: " + this.getPort());
   }
 
   private void clientNoCommand() {
-    clientUI.display
+    this.clientUI.display
       ("This command does not exist.");
   }
   
@@ -181,35 +192,45 @@ public class ChatClient extends AbstractClient
    */
   public void quit()
   {
-    try
-    {
-      closeConnection();
-    }
-    catch(IOException e) {}
+    try {
+      this.closeConnection();
+    } catch(IOException e) {}
     System.exit(0);
   }
 
+  /**
+   * Callback to show a message when the connection is closed.
+   */
+  @Override
   protected void connectionClosed() {
-    clientUI.display
+    this.clientUI.display
       ("Connection closed.");
   }
 
+  /**
+   * Callback to show a message and quit when the server shuts down.
+   */
+  @Override
   protected void connectionException(Exception exception) {
-    clientUI.display
+    this.clientUI.display
       ("The server has shut down.  Terminating client.");
     System.exit(0);
   }
 
+  /**
+   * Send a the loginId to the server when the connection is first established
+   */
+  @Override
   protected void connectionEstablished() {
     try {
-      sendToServer("#login " + this.loginId);
+      this.sendToServer("#login " + this.loginId);
       System.out.println(this.loginId + " has logged on.");
     }
     catch(IOException e)
     {
-      clientUI.display
+      this.clientUI.display
         ("Could not send message to server.  Terminating client.");
-      quit();
+      this.quit();
     }
   }
 }
